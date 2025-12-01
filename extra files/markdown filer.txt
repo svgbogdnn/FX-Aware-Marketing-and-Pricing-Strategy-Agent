@@ -1,0 +1,1757 @@
+## Problem: FX-Aware Pricing and Marketing Decisions Are Still Largely Manual
+
+Large consumer-electronics companies that sell globally face a deceptively simple question every time they launch or re-position a product:
+
+> *“At what price can we launch this device in market X so that we stay competitive, hit our margin targets, and don’t get destroyed by FX moves over the next few months?”*
+
+In practice, answering this question is neither simple nor automated.
+
+### Real-world context
+
+This project is inspired by a real case: a marketing / pricing manager responsible for high-value devices (laptops, smartphones, accessories) across multiple regions. A typical “pricing round” for a single product and country looks like this:
+
+- pull internal cost data (often in CNY or another procurement currency),
+- check current and planned list prices in USD (or local reporting currency),
+- collect competitor prices from dashboards, web sources, or sales teams,
+- build an ad-hoc Excel model with a few FX scenarios (e.g., ±5–10% move),
+- compute margins under each scenario,
+- write a short email / slide summarizing: *“Here’s the market, here’s our position, here’s my recommended price and why.”*
+
+This process is repeated again and again:
+- for **dozens or hundreds of SKUs**,
+- across multiple regions,
+- under constant **FX volatility** and **competitive moves**.
+
+It takes hours of manual work, is hard to standardize, and is very easy to get wrong.
+
+### Why this is a serious enterprise problem
+
+From an enterprise perspective, the pain points fall into a few clear categories:
+
+1. **FX risk is real, but systematically under-modeled.**  
+   Costs are incurred in CNY (or other procurement currencies), revenues and reporting are in USD or local currencies. Even modest FX moves can:
+   - erode margins on a “successful” product launch,
+   - make a previously acceptable price suddenly unprofitable,
+   - or conversely leave money on the table when FX moves in the company’s favour.  
+   Yet, FX scenarios are often modeled manually by non-specialists using crude assumptions.
+
+2. **Pricing and marketing decisions are fragmented.**  
+   The real decision needs to combine:
+   - market and segment understanding,
+   - competitor price positioning,
+   - target margin and finance constraints,
+   - FX scenarios and risk appetite,
+   - and a final narrative that leadership can understand quickly.  
+   In most organizations, these pieces live in different tools and in different teams’ heads (Marketing, Finance, Regional Sales), and are stitched together by a manager under time pressure.
+
+3. **The process does not scale.**  
+   For one hero product, a senior manager can manually do a careful analysis.  
+   For **hundreds or thousands of devices** across many markets, this breaks:
+   - analysts copy-paste old spreadsheets,
+   - assumptions drift and diverge,
+   - documentation is inconsistent or missing,
+   - there is no portfolio-level view of FX risk and margin resilience.
+
+4. **Lack of transparency and reproducibility.**  
+   When leadership asks *“Why exactly did we decide on \$3,499 rather than \$3,599?”* the answer is often buried in someone’s personal Excel file or email thread. There is:
+   - no standardized decision brief,
+   - no machine-readable record of assumptions,
+   - no automatic quality evaluation of the recommendation.
+
+5. **High opportunity cost.**  
+   Pricing and marketing managers spend a non-trivial share of their time:
+   - pulling data,
+   - cleaning it,
+   - re-building similar models from scratch,  
+   instead of exploring scenarios, planning campaigns, or aligning with sales.  
+   Every extra hour spent on manual spreadsheets is an hour not spent on higher-value strategic work.
+
+### Where an FX-aware agent can help
+
+This is precisely the gap the **FX-Aware Marketing & Pricing Strategy Agent** targets:
+
+- It encodes a repeatable, auditable version of what an experienced pricing manager does by hand:
+  - read the product and market context,
+  - look at competitors and price bands,
+  - model FX scenarios and margin impact,
+  - choose a price and explain the recommendation.
+- It is designed for **enterprise scale**:
+  - the same logic can be applied to **1 device or 1,000 devices**,
+  - results are stored as structured JSON plus a human-friendly decision brief,
+  - every step is observable (logs, metrics, evaluation scores).
+- It reduces both **decision latency** (time to get a solid recommendation) and **decision variance** (different analysts making inconsistent calls under the same conditions).
+
+In short, the problem is not that enterprises lack data or spreadsheets.  
+The problem is that **FX-aware pricing decisions remain a manual, fragile workflow** that does not scale to the size and volatility of modern global portfolios. This project frames that workflow as a candidate for automation by a multi-agent system: an orchestration of specialized agents that can consistently produce FX-robust pricing strategies, with explanations, at the same depth that a human pricing manager would aim for—but at portfolio scale.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Solution: FX-Aware Marketing & Pricing Strategy Agent
+
+The **FX-Aware Marketing & Pricing Strategy Agent** turns the manual, fragile workflow of FX-sensitive pricing into a repeatable, auditable multi-agent pipeline. Instead of one person re-building the same logic in spreadsheets for every launch, the system encodes this decision process as an orchestrated team of specialized agents.
+
+### What the agent does at a high level
+
+At its core, the system takes a **single product configuration** as input, for example:
+
+- product name and category (e.g. *“Apple MacBook Pro 16 M3 Max, premium laptop”*),
+- target region and reporting currency (e.g. US / USD),
+- procurement currency and purchase price (e.g. CNY cost),
+- planned or current list price,
+- target margin band,
+- volume assumptions and high-level manager notes.
+
+Given this configuration, the pipeline executes a sequence of agents that collectively answer four questions:
+
+1. **Where does this product sit in its market and competitive landscape?**  
+2. **How do different FX scenarios affect our landed cost and margin?**  
+3. **What price (or price range) makes sense given our target positioning and risk appetite?**  
+4. **Can we summarize the recommendation in a concise, decision-ready brief with a quality score?**
+
+The final output is a **single, structured result object** that contains:
+
+- a natural-language **decision brief** for humans,
+- a **structured summary JSON** with key fields (price band, recommended price, margin by scenario, risks),
+- a **machine-readable evaluation JSON** from the evaluation agent,
+- **observability metadata** (model/tool/agent invocations, error counts, basic health),
+- optional **memory keys** so the run can be retrieved in future portfolio analysis.
+
+This makes the agent suitable both for direct human consumption (pricing managers, PMs, leadership) and for integration into downstream systems (dashboards, reporting pipelines, automated alerts).
+
+### How the solution improves the enterprise workflow
+
+The system is designed explicitly with **enterprise workflows** in mind and addresses the pain points from the problem statement:
+
+1. **From ad-hoc spreadsheets to a standardized decision process**  
+   Instead of every manager building their own Excel model and narrative, the agent enforces a consistent flow:
+   - market and competitor context →  
+   - FX scenarios and landed cost →  
+   - margin simulations →  
+   - pricing recommendation →  
+   - evaluation and health-check.  
+   Each step is implemented by a specialized agent, and the orchestrator ensures the same logical structure is applied to every product.
+
+2. **FX risk modeled explicitly, not as an afterthought**  
+   FX exposure is treated as a first-class concern:
+   - a dedicated FX / vendor FX layer models one or more plausible FX shocks,
+   - margin is recalculated under adverse, base and favorable scenarios,
+   - the recommendation explicitly states not just “the price”, but also **how robust that price is** to FX moves.  
+   This moves the organization from *“hopefully the spreadsheet was correct”* to a documented, scenario-based view of FX risk for each device.
+
+3. **From single-SKU thinking to portfolio-level scale**  
+   The same pipeline that runs for one MacBook can be applied to **hundreds or thousands of SKUs**:
+   - a batch runner can feed in a list of device configurations (e.g. 1,000 high-value SKUs),
+   - each run produces structured outputs and evaluation scores,
+   - aggregated metrics show how the portfolio behaves under FX risk and whether the agent’s recommendations stay within acceptable bounds.  
+   This is exactly where manual processes break, and where a multi-agent system can provide leverage.
+
+4. **Built-in explainability and audit trail**  
+   Every run is accompanied by:
+   - a human-readable decision brief that explains *why* the agent recommends a given price,
+   - a structured JSON summary that can be stored and re-analyzed,
+   - observability data (invocation counts, basic health) and an evaluation score.  
+   This makes it possible to answer leadership questions such as:
+   - “What assumptions did we make about FX when we launched this device?”
+   - “How did we position ourselves vs. competitor X in Q3?”
+   - “Has the quality of our recommendations regressed between last quarter and this quarter?”
+
+5. **Freeing pricing and marketing managers from low-leverage work**
+
+   The agent is not meant to replace human decision-makers. It is meant to:
+   - automate the **mechanical** part (pulling data, running scenarios, drafting a first recommendation),
+   - provide a **high-quality first draft** that a pricing manager can review, tweak, and approve,
+   - keep a consistent history of decisions and rationales.  
+   This lets managers spend more time:
+   - discussing trade-offs,
+   - coordinating with regional teams,
+   - planning campaigns and promotions,
+   rather than copy-pasting numbers between tabs.
+
+### Fit with the “Enterprise Agents” track
+
+From the Kaggle competition’s point of view, this solution is a natural fit for the **Enterprise Agents** track:
+
+- It focuses on a **concrete business workflow**: FX-aware pricing and marketing strategy for global product launches.
+- It is built as a **multi-agent system** that improves:
+  - data collection and aggregation,
+  - analytical modeling (FX + margin),
+  - decision documentation,
+  - and quality control.
+- It is designed to be:
+  - modular (each agent can be iterated independently),
+  - observable (metrics and logs are built-in),
+  - and scalable (the same architecture runs for 1 or 1,000 products).
+
+In short, the **FX-Aware Marketing & Pricing Strategy Agent** turns a scattered, manual enterprise process into a structured, agent-driven pipeline that consistently generates FX-robust pricing strategies, along with the narratives and metrics needed to trust and audit those decisions.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Architecture: Multi-Agent Pricing Pipeline (Orchestrator + 7 Agents)
+
+At the core of the project is a **multi-agent pipeline** that encodes the full pricing workflow as a sequence of specialized LLM agents coordinated by a single orchestrator. Instead of one large “do everything” prompt, each agent is responsible for a clearly defined step with a well-specified input/output contract.
+
+### 4.1 High-Level Data Flow
+
+For each product configuration, the system flows through the following stages:
+
+1. **Orchestrator** receives the product context (name, region, currencies, costs, candidate price, target margin, volume, manager notes).
+2. **Market Research Agent** enriches this with market and segment insights, plus an approximate price band.
+3. **Competitive Pricing Agent** refines the price band and positioning using competitor data.
+4. **Vendor FX Agent** retrieves FX assumptions and scenarios (via A2A).
+5. **FX Impact Analysis Agent** computes landed cost and margin under each FX scenario.
+6. **Margin Scenario Planner Agent** explores candidate price points and strategies (match / undercut / premium).
+7. **Decision Brief Agent** turns all structured data into an executive-ready decision brief.
+8. **Evaluation Agent-as-Judge** reviews the final recommendation and assigns a structured quality score.
+
+The orchestrator stitches these stages into a **single end-to-end run**, exposing a clean API:
+
+- Input: product configuration + run options.  
+- Output: `result` object containing
+  - decision brief,
+  - structured summary JSON,
+  - evaluation JSON,
+  - observability summary,
+  - basic health flags,
+  - references to stored memory.
+
+### 4.2 Orchestrator Agent
+
+The **FX-Aware Orchestrator Agent** is the control plane of the system. Its responsibilities are:
+
+- **Routing and composition**
+  - Calls each specialized agent in the correct order.
+  - Passes structured outputs (JSON) from one agent as inputs to the next.
+  - Merges intermediate results into a shared context dict.
+
+- **Session & memory integration**
+  - Creates or resumes sessions using the session/memory service.
+  - Writes key artifacts (briefs, summaries, evaluations) into memory for later retrieval.
+  - Reads past runs when needed (e.g. for regression or portfolio analysis).
+
+- **Observability and health**
+  - Attaches logging and callback plugins so that every model/tool/agent invocation is tracked.
+  - Collects counters (LLM calls, tool calls, agent calls, errors).
+  - Builds a compact **basic health** object summarizing whether the run was successful and where issues occurred.
+
+- **Error handling and fallbacks**
+  - Handles validation errors (e.g. bad JSON from an agent) and can re-prompt or return structured error information.
+  - Ensures that downstream agents are not called if an upstream step failed in a critical way.
+
+- **Scalability and batch execution**
+  - The same orchestrator function is used both for:
+    - **single-scenario runs** (interactive demo, one device),
+    - **batch runs** (hundreds or thousands of product configs in regression tests).
+
+Conceptually, the orchestrator plays the role of a senior pricing lead: it coordinates the “team” of specialist agents, checks that each contributes the right piece of information, and assembles a complete decision package.
+
+### 4.3 Specialized Agents
+
+Each specialized agent is an LLM-powered component with a narrow, well-defined role. All agents follow a similar pattern:
+
+- receive a typed context structure from the orchestrator (plus any tool outputs),
+- produce both natural-language analysis and structured JSON,
+- avoid side effects (no direct state writes; all state changes go via orchestrator and tools).
+
+Below is an overview of the seven core agents.
+
+#### 4.3.1 Market Research Agent
+
+**Goal:** Place the product in its **market and segment context**.
+
+- **Inputs**
+  - Product snapshot (name, category, key specs).
+  - Region and currency.
+  - Manager notes (e.g. “flagship device”, “target prosumers”).
+
+- **Tools**
+  - `get_product_snapshot` – structured metadata about the SKU.
+  - Optional: internal or synthetic references to similar devices.
+
+- **Outputs**
+  - High-level description of the market (segment, typical use cases).
+  - A first estimate of the **typical price band** for similar devices in the region.
+  - Flags about positioning (mainstream vs premium vs ultra-premium).
+  - Structured JSON: `{ market_summary, initial_price_band }`.
+
+This agent answers: *“What game are we playing and roughly what are the stakes?”*
+
+#### 4.3.2 Competitive Pricing Agent
+
+**Goal:** Refine the price band and positioning based on **competitor pricing**.
+
+- **Inputs**
+  - Market summary and initial price band from the Market Research Agent.
+  - Product snapshot and region.
+- **Tools**
+  - `get_competitive_snapshot` – structured list of key competitors, their prices and positioning.
+- **Outputs**
+  - Refined price band (low/high) based on competitor list.
+  - Assessment of current or planned price vs competitors (undercut / parity / premium).
+  - Structured JSON: `{ competitors, competitive_band, competitive_position }`.
+
+This agent answers: *“Where would we sit if we priced at X vs known competitors?”*
+
+#### 4.3.3 Vendor FX Agent (Remote A2A)
+
+**Goal:** Provide **FX scenarios and assumptions** for further margin analysis.
+
+- **Inputs**
+  - Procurement currency (e.g. CNY) and reporting/transaction currency (e.g. USD).
+  - Base FX rate assumptions or identifiers.
+- **Tools / A2A**
+  - Implemented as a `RemoteA2aAgent` (or equivalent), simulating a call to an external FX microservice.
+  - Can wrap an FX scenario tool (`get_fx_scenarios`) to obtain base/adverse/favorable rate sets.
+- **Outputs**
+  - A small set of FX scenarios, e.g. base, adverse (CNY appreciates vs USD), favorable (CNY depreciates vs USD).
+  - Structured JSON: `{ fx_scenarios: [ {label, rate, shock_pct}, ... ] }`.
+
+This agent answers: *“What plausible FX worlds should we stress-test against?”*
+
+#### 4.3.4 FX Impact Analysis Agent
+
+**Goal:** Translate FX scenarios into **landed cost and margin impact**.
+
+- **Inputs**
+  - FX scenarios from the Vendor FX Agent.
+  - Purchase price in procurement currency.
+  - Other cost components if present.
+- **Tools**
+  - Simple numeric helpers (embedded tools) to apply FX rates to cost.
+- **Outputs**
+  - Landed cost per unit for each scenario.
+  - Margin per scenario at the current or candidate price.
+  - Structured JSON: `{ fx_impact: [ {label, landed_cost, margin_pct}, ... ] }`.
+
+This agent answers: *“If FX moves like this, what happens to our unit economics?”*
+
+#### 4.3.5 Margin Scenario Planner Agent
+
+**Goal:** Explore **pricing and margin scenarios** and propose a strategy.
+
+- **Inputs**
+  - FX impact results.
+  - Target margin band (e.g. 25–30%).
+  - Competitive band and positioning.
+- **Tools**
+  - `compute_margin_plan` – a tool that helps simulate margin for different candidate prices.
+- **Outputs**
+  - Candidate prices (e.g. current price, slightly higher/lower anchors).
+  - Margin at each price under each FX scenario.
+  - Recommended pricing strategy label (e.g. *“Premium Value”, “Aggressive Match”, “Margin Protection”*).
+  - Structured JSON: `{ candidate_prices, margins_by_scenario, strategy_label }`.
+
+This agent answers: *“Which price levels and strategy best balance margin, competitiveness and FX risk?”*
+
+#### 4.3.6 Decision Brief Agent
+
+**Goal:** Synthesize all upstream results into a **decision-ready brief**.
+
+- **Inputs**
+  - Market and competitive insights.
+  - FX scenarios and their margin impact.
+  - Candidate prices and strategy recommendation.
+- **Tools**
+  - Internal formatting helpers to structure the brief into sections.
+- **Outputs**
+  - Clear narrative: market context, competitive landscape, FX risk, recommended price, explicit rationale.
+  - Structured summary JSON with the recommended price and key metrics.
+  - Structured JSON: `{ decision_brief_text, structured_summary_json }`.
+
+This agent answers: *“How do we explain this recommendation to a pricing committee in one page?”*
+
+#### 4.3.7 Evaluation Agent-as-Judge
+
+**Goal:** Provide an **automatic quality assessment** of the recommendation.
+
+- **Inputs**
+  - Decision brief, structured summary JSON, and relevant context.
+- **Tools**
+  - None externally; uses its own scoring rubric inside the prompt.
+- **Outputs**
+  - Overall numeric score.
+  - Scores along four dimensions (e.g. coverage, consistency, clarity, actionability).
+  - Flags highlighting strengths and weaknesses.
+  - Structured JSON: `{ overall_score, dimensions, flags, summary_comment }`.
+
+This agent answers: *“Is this recommendation good enough to trust, and where can it be improved?”*
+
+### 4.4 Shared Data Contracts and Context
+
+All agents communicate via **structured data contracts** enforced by the orchestrator:
+
+- Each step writes to a shared `context` object under well-known keys
+  (`market_summary`, `competitive_band`, `fx_scenarios`, `fx_impact`, `margin_plan`, `decision_brief`, `evaluation`).
+- JSON outputs are validated and, when necessary, repaired or re-asked by the orchestrator.
+- This structure makes it easy to:
+  - log and store intermediate results,
+  - run regression tests (e.g. on 1,000 devices),
+  - feed outputs into dashboards or other systems without re-parsing free-form text.
+
+### 4.5 Why a Multi-Agent Architecture (vs One Big Agent)
+
+Choosing a multi-agent design over a single huge prompt brings concrete advantages:
+
+- **Separation of concerns** – each agent’s prompt and schema stay focused and maintainable.
+- **Testability** – agents can be smoke-tested in isolation and in composition.
+- **Reusability** – individual agents (e.g. FX Impact or Evaluation) can be reused in other workflows.
+- **Observability** – per-agent metrics (latency, errors, cost) make bottlenecks visible.
+- **Scalability** – portfolio-level runs benefit from consistent structure and simpler parallelization strategies.
+
+In summary, the architecture is a **multi-agent pricing “assembly line”**: the orchestrator coordinates a team of 7 specialized LLM agents that together reproduce the reasoning workflow of an experienced pricing manager, but in a modular, observable and scalable way.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Mapping to Capstone Key Concepts
+
+This project is intentionally designed to cover **most of the key concepts** listed in the Capstone brief. Below is a direct mapping from the official feature list to what is actually implemented in the **FX-Aware Marketing & Pricing Strategy Agent**.
+
+---
+
+### 1. Multi-agent system
+
+**Agent powered by an LLM**
+
+- Every major component is an LLM-powered agent:
+  - FX-Aware Orchestrator Agent
+  - Market Research Agent
+  - Competitive Pricing Agent
+  - Vendor FX Agent (Remote A2A)
+  - FX Impact Analysis Agent
+  - Margin Scenario Planner Agent
+  - Decision Brief Agent
+  - Evaluation Agent-as-Judge
+
+**Sequential agents**
+
+- The core architecture is a **sequential pipeline**:
+  - Orchestrator → Market Research → Competitive Pricing → Vendor FX → FX Impact → Margin Planner → Decision Brief → Evaluation.
+- Each agent receives a **structured context** from the previous step and writes its results back into a shared context object.
+- This makes the reasoning process transparent and easy to debug: any stage can be inspected or re-run.
+
+**Parallel / loop agents (design)**
+
+- The notebook focuses on a clean sequential path for one product at a time, which is then reused in **looped batch runs** (e.g. 1,000 devices).
+- The orchestrator and batch runner are written so that, if needed, the same function can be executed in parallel over a portfolio (e.g. via a job system or cloud runtime), without changing the agent logic.
+
+---
+
+### 2. Tools
+
+**Custom tools**
+
+- A set of custom tools is defined and wrapped with ADK `FunctionTool` / `AgentTool`, including:
+  - `get_product_snapshot` – provides a structured description of a product (name, category, purchase price, volume, manager notes, etc.).
+  - `get_competitive_snapshot` – returns a synthetic yet realistic competitor set with prices and positioning labels.
+  - `get_fx_scenarios` – generates base / adverse / favorable FX scenarios for a given currency pair.
+  - `compute_margin_plan` – computes margin projections for different candidate prices under multiple FX scenarios.
+  - `export_conversation` / `export_logs` – admin tools to export full traces of an orchestrator run for offline analysis.
+
+**Built-in / code-execution style tools**
+
+- Numeric logic (e.g. margin calculations, truncation of long texts, parsing and validation of JSON) is encapsulated in lightweight Python helpers that are exposed as tools to agents when needed.
+- This allows the LLM agents to offload “hard math” and focus on reasoning, while the tools enforce consistent formulas.
+
+**OpenAPI / MCP**
+
+- The design assumes that tools like `get_fx_scenarios` or external FX services could be backed by an OpenAPI / MCP source.
+- In this notebook implementation, the focus is on **custom tools**, but the agent contracts are written in a way that would allow swapping in a real OpenAPI-backed FX or pricing service without changing the agent prompts.
+
+---
+
+### 3. Long-running operations
+
+- The project explicitly models **long-running, portfolio-level scenarios**:
+  - A batch runner uses the same orchestrator to process **1,000 device configurations** in a single scenario.
+  - For each device, the full pipeline is executed end-to-end, and results are collected into `evaluation_results`.
+- The code separates:
+  - **interactive runs** (single device demo),
+  - **regression / portfolio runs** (100+ / 1,000+ devices).
+- Scenario outputs are saved for later inspection (and partially truncated in the notebook view, with full logs exported to external storage).
+
+> While there is no UI button labeled “pause / resume”, the system is designed so that a long-running scenario can be split into chunks (e.g. batches of devices), with intermediate results persisted and later resumed or re-analyzed.
+
+---
+
+### 4. Sessions & Memory
+
+**Sessions & state management**
+
+- The orchestrator integrates with a **session service** (e.g. `InMemorySessionService`) to:
+  - create a new session per scenario,
+  - attach a session ID to each agent call,
+  - record intermediate artifacts (briefs, JSON summaries, evaluations) under that session.
+
+**Long-term memory / Memory Bank**
+
+- A Memory layer stores:
+  - prior decision briefs and summaries,
+  - evaluation results over time,
+  - references to exported logs and conversations.
+- This enables:
+  - portfolio-level analysis (e.g. compare how MacBook US pricing recommendations evolved),
+  - regression testing (check that new model versions don’t degrade overall scores).
+
+**Context engineering / compaction**
+
+- For long or repeated runs, the code uses:
+  - structured contexts (JSON per agent, not raw transcripts),
+  - truncated text fields (first N characters) for console printing,
+  - summary objects to avoid re-injecting full raw traces into each new agent call.
+- This is effectively **context compaction**: only the essential fields are carried forward between agents and across runs, which keeps prompts and memory footprints under control.
+
+---
+
+### 5. Observability: Logging, Tracing, Metrics
+
+- A dedicated observability layer wraps agents and tools with:
+  - **logging plugins** that record each model invocation, tool call, agent call and error,
+  - **invocation counters** (how many times models, tools and agents were invoked for a scenario),
+  - **basic health summaries** (boolean pass/fail + issue count + key flags).
+- For each orchestrator run, the final result includes an **observability summary** with:
+  - `model_invocations`,
+  - `tool_invocations`,
+  - `agent_invocations`,
+  - `error_count`,
+  - `event_count`.
+- These metrics are used both:
+  - in the demo (to show that the system behaves like a real monitored service),
+  - in testing (to compare behavior across large batches or model versions).
+
+---
+
+### 6. Agent evaluation
+
+- The project includes a dedicated **Evaluation Agent-as-Judge**, which:
+  - reads the decision brief and structured summary,
+  - assigns a numeric **overall score**,
+  - scores multiple **dimensions** (coverage, consistency, clarity, actionability),
+  - emits **flags** (e.g. good_structure, clear_fx_risk_identification, weak_link_to_target_margin),
+  - produces a short **summary comment**.
+- This evaluation is used in two ways:
+  1. For **single demo runs**, to show the quality of one recommendation.
+  2. For **portfolio regression (1,000 devices)**, where the evaluation outputs are aggregated into `evaluation_results` to analyze:
+     - average scores per dimension,
+     - distribution of scores,
+     - potential regressions after prompt or architecture changes.
+
+This satisfies the “Agent evaluation” concept with a concrete, structured, quantitative implementation.
+
+---
+
+### 7. A2A Protocol
+
+- One of the agents is implemented as a **Remote A2A Agent** (the Vendor FX Agent), which conceptually:
+  - represents an external FX microservice or specialized model,
+  - is called via the A2A protocol rather than as a local LLM,
+  - returns structured FX scenarios into the pipeline.
+- The orchestrator treats this FX agent exactly like any other agent:
+  - passes it a narrow input contract (currencies, base assumptions),
+  - receives a well-typed JSON response with scenarios,
+  - propagates these scenarios into downstream agents.
+
+This demonstrates how the system could be split across multiple runtimes or services, with agents living in different processes or clouds.
+
+---
+
+### 8. Agent deployment (design perspective)
+
+- This notebook focuses on **architecture, implementation and evaluation**, not on shipping a live endpoint.
+- However, several design choices make the system **deployment-ready**:
+  - The orchestrator exposes a clean function signature: `run_fx_pricing_orchestrator(config) -> result`.
+  - All agents are stateless from the caller’s perspective (state lives in tools and memory).
+  - Inputs/outputs are pure JSON-serializable objects, suitable for REST / gRPC / A2A calls.
+  - Observability and evaluation are already integrated, which is essential for production deployments.
+- In a cloud runtime (e.g. Vertex AI Agent Engine or Cloud Run), the orchestrator could be wrapped as:
+  - a single HTTP endpoint taking a product configuration,
+  - or a job processor for batched pricing runs.
+
+Even without a live deployment in this submission, the code is structured so that **moving from notebook to service** is mostly a packaging and configuration exercise, not a redesign of the core logic.
+
+---
+
+Overall, the project demonstrates **far more than the required three concepts**: a multi-agent LLM system, rich custom tools, long-running portfolio evaluations, session & memory management, robust observability, agent-as-judge evaluation, and A2A integration—all tied together around a realistic enterprise pricing workflow.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Effective Use of Gemini in the Agent Stack
+
+All core agents in this project are powered by a **Gemini model accessed via the Google GenAI / ADK stack**. Rather than using the LLM as a generic “chatbot”, the notebook treats Gemini as a set of **specialized reasoning engines** behind each agent, with clear schemas, tools and responsibilities.
+
+### 6.1 Where Gemini is used
+
+Every major LLM hop in the pipeline is backed by Gemini:
+
+- **FX-Aware Orchestrator Agent** – coordinates sub-agents, interprets their structured outputs and decides which agent to call next, when to stop, and how to assemble the final result object.
+- **Market Research Agent** – uses Gemini to read product context and synthesize a compact but informative market/segment overview and a first price band.
+- **Competitive Pricing Agent** – relies on Gemini to reason over competitor data, relative positioning, and to refine the competitive price band.
+- **Vendor FX Agent (Remote A2A)** – uses Gemini (remotely, via A2A) to interpret FX configuration and produce meaningful scenario labels and explanations.
+- **FX Impact Analysis Agent** – combines numerical tool outputs (costs, FX rates) with qualitative reasoning about risk and robustness.
+- **Margin Scenario Planner Agent** – uses Gemini to evaluate trade-offs between candidate prices, target margin and competitive pressure, and to choose a coherent strategy label.
+- **Decision Brief Agent** – uses Gemini’s long-context narrative ability to transform multiple JSON fragments into a single executive-ready brief.
+- **Evaluation Agent-as-Judge** – uses Gemini for structured, rubric-based scoring along four dimensions (coverage, consistency, clarity, actionability).
+
+In other words, Gemini is not just “one model call at the end”; it is the **shared reasoning backbone** for each modular agent.
+
+### 6.2 Why Gemini is a good fit here
+
+The FX-aware pricing problem stresses three things that Gemini is particularly strong at:
+
+1. **Multi-step, tool-augmented reasoning**  
+   - Agents regularly alternate between:
+     - calling tools for hard numbers (e.g. FX scenarios, margin calculations),
+     - and asking Gemini to interpret those numbers in context.  
+   - Prompts are written so that Gemini:
+     - reads JSON from tools,
+     - reasons about it (e.g. *“How does adverse FX affect our margin?”*),
+     - and emits new, well-typed JSON back to the orchestrator.  
+   - This “LLM ↔ tools ↔ LLM” loop is central to market research, FX impact and margin planning.
+
+2. **Structured outputs with strict schemas**  
+   - Every agent must return both **natural language** and **structured JSON** (e.g. `structured_summary_json`, `evaluation_json`).
+   - Prompts leverage Gemini’s ability to:
+     - follow a JSON schema,
+     - avoid leaking free-form text into structured fields,
+     - and recover from minor formatting errors when they occur.  
+   - This is what allows the orchestrator and test harness to run the same pipeline on **1,000 devices** and then aggregate results programmatically.
+
+3. **Long-context synthesis and rewriting**  
+   - The **Decision Brief Agent** is a showcase of Gemini’s long-context capabilities:
+     - it receives multiple structured fragments (market summary, competitor band, FX scenarios, margin plan),
+     - and turns them into a concise, well-structured brief that a pricing committee can read in a few minutes.  
+   - Gemini is also used to generate **evaluation comments** that summarize strengths and weaknesses of each recommendation, even when the input context is large.
+
+### 6.3 Highlight: FX Impact + Margin Planning powered by Gemini
+
+The combination of the **Vendor FX Agent**, **FX Impact Analysis Agent** and **Margin Scenario Planner Agent** demonstrates “effective use of Gemini” beyond simple text generation:
+
+- Tools compute scenario-level numbers: FX rates, landed cost, margin per unit.
+- Gemini is asked to:
+  - interpret whether margins are resilient under adverse FX,
+  - compare scenarios to target margin bands,
+  - decide whether the situation calls for a *“Premium Value”*, *“Aggressive Match”* or *“Margin Protection”* strategy,
+  - explain the trade-offs in plain language.
+
+This turns raw numbers into **actionable pricing guidance**. The same pattern is reused across hundreds of products in the 1,000-device regression, with Gemini providing consistent reasoning across the entire portfolio.
+
+### 6.4 Highlight: Evaluation Agent as a Gemini “Judge”
+
+The **Evaluation Agent-as-Judge** is another focused use of Gemini:
+
+- It receives the final decision brief and structured summary.
+- It applies a rubric encoded in the prompt to score:
+  - **coverage** (did the brief touch all important aspects?),
+  - **consistency** (are numbers and statements aligned?),
+  - **clarity** (is the recommendation easy to understand?),
+  - **actionability** (does it tell a manager what to do next?).  
+- It then returns:
+  - an overall numeric score,
+  - per-dimension scores,
+  - a list of flags (strengths/weaknesses),
+  - and a short textual comment.
+
+These evaluation outputs are aggregated across the 1,000-device run to track **average quality** and detect regressions when prompts or models are updated. This is a concrete example of Gemini being used not only to *produce* content, but also to **audit and score** other agents’ work.
+
+### 6.5 Summary: Gemini as the engine of the multi-agent system
+
+In summary, Gemini is used **throughout** the project to:
+
+- power every major agent in the pipeline,
+- combine tool outputs with domain reasoning,
+- enforce structured JSON contracts,
+- synthesize long, multi-source contexts into concise briefs,
+- and act as an internal “judge” for automated evaluation.
+
+This goes well beyond a single “chat-style” call and demonstrates **effective, multi-faceted use of Gemini** in an enterprise-grade, FX-aware pricing and marketing workflow.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Tools Infrastructure: Domain Logic for FX-Aware Pricing
+
+The agents in this project do not “hallucinate” numbers or business logic on their own. All critical facts and calculations – product data, competitor snapshots, FX scenarios, margin math and observability exports – flow through a dedicated **tools layer**. LLM agents are responsible for reasoning and explanation; tools are responsible for **ground truth and deterministic logic**.
+
+### 7.1 Role of tools in the architecture
+
+The system follows a consistent pattern:
+
+- Agents receive a **structured context** from the orchestrator.
+- When they need factual data or numeric results, they call one or more **tools**.
+- Tools return **well-typed Python / JSON structures**, which the agent then interprets and weaves into its narrative and JSON outputs.
+
+This separation gives three immediate benefits:
+
+1. **Determinism** – key numbers (cost, FX rate, margin) come from tools, not from free-form LLM text.  
+2. **Testability** – tools are easy to unit-test in isolation (see the Testing section).  
+3. **Swapability** – in production, the same tool contracts can be wired to real APIs or data warehouses without changing agent prompts.
+
+---
+
+### 7.2 Domain tools for the pricing workflow
+
+The core pricing workflow is supported by a small set of **domain tools** which encode business rules and calculations.
+
+#### `get_product_snapshot()`
+
+Provides a structured view of a single product configuration:
+
+- Inputs: product identifier or a configuration object (name, category, purchase price, volume, target margin, manager notes, user_id, etc.).
+- Output: a normalized **product snapshot** with all fields an agent needs in one place.
+- Used by:
+  - Market Research Agent (to understand what we are pricing),
+  - Orchestrator (to pass compact product context further down the pipeline).
+
+This tool is effectively the “single source of truth” for per-device metadata inside the agent system.
+
+#### `get_competitive_snapshot()`
+
+Returns a synthetic but realistic picture of the competitive landscape:
+
+- Inputs: product category, region, sometimes basic positioning hints.
+- Output: a list of competitor entries with fields like name, price, positioning label and notes.
+- Used by:
+  - Competitive Pricing Agent to refine the price band and positioning,
+  - Decision Brief Agent to reference specific competitors in the narrative.
+
+This abstracts away how exactly competitor data is obtained (internal DB, scraped, API) and gives the agents a clean, stable schema.
+
+#### `get_fx_scenarios()`
+
+Encodes FX risk as structured scenarios:
+
+- Inputs: procurement currency (e.g. CNY), reporting currency (e.g. USD), base rate or configuration.
+- Output: a small set of FX scenarios, typically including labels such as *Base*, *Adverse*, *Favorable* with associated rates and shock percentages.
+- Used by:
+  - Vendor FX Agent (Remote A2A) as the underlying numeric source for FX reasoning,
+  - FX Impact Analysis Agent to translate scenarios into landed costs and margins.
+
+This keeps the FX logic explicit and makes it easy to adjust or extend scenarios without touching agent prompts.
+
+#### `compute_margin_plan()`
+
+Performs margin and pricing calculations for multiple candidate prices:
+
+- Inputs: landed cost per scenario, candidate prices, target margin band.
+- Output: a structured margin table (margins by scenario and by price) plus derived summary metrics.
+- Used by:
+  - Margin Scenario Planner Agent as the numeric backbone for its strategy recommendation.
+
+Because this logic lives in a tool, margin formulas are **transparent and repeatable**, and can be tested independently of any LLM behavior.
+
+---
+
+### 7.3 Operational and export tools
+
+In addition to domain tools, the project defines several **operational / admin tools** that support observability and offline analysis.
+
+#### `export_conversation()`
+
+- Exports the full conversation trace for an orchestrator run (agents, intermediate messages, prompts) into a persistent format.
+- Used for:
+  - offline review of complex cases,
+  - preparing examples for documentation and demo.
+
+#### `export_logs()`
+
+- Exports structured logs and metrics collected by the observability layer (events, invocation counters, errors).
+- Used for:
+  - regression analysis (especially on the 1,000-device run),
+  - debugging and performance profiling.
+
+These tools bridge the gap between the notebook and a production-like workflow where logs and traces are essential for compliance and post-mortems.
+
+---
+
+### 7.4 Design principles for tools
+
+The tools layer is implemented with a few strict design rules:
+
+1. **Pure, side-effect-free behavior (where possible)**  
+   - Domain tools like `get_product_snapshot`, `get_competitive_snapshot`, `get_fx_scenarios`, `compute_margin_plan` behave as pure functions for a given input.
+   - This makes them easy to cache, unit-test and reason about.
+
+2. **Stable, typed contracts**  
+   - Each tool returns a predictable structure (dict / dataclass-like) with named fields.
+   - Agents are written against these contracts rather than parsing arbitrary strings, which reduces brittleness and JSON repair overhead.
+
+3. **Orchestrator-controlled side effects**  
+   - Any operation with side effects (exporting logs, writing to external storage) is called from the orchestrator or a dedicated admin agent, not from deep inside arbitrary prompts.
+   - This keeps the “surface area” of side effects small and auditable.
+
+4. **Symmetry between interactive and batch runs**  
+   - The same tools are used in:
+     - interactive demos (single device),
+     - batch and regression runs (100 or 1,000 devices).
+   - This guarantees that the behavior seen in the demo is representative of portfolio-scale usage.
+
+---
+
+### 7.5 Why tools are central for the Enterprise Agents track
+
+From the competition’s **Enterprise Agents** perspective, the tools layer is what turns this project from a “smart prompt” into a **realistic enterprise system**:
+
+- Domain logic (product data, FX scenarios, margin formulas) is clearly separated from LLM reasoning.
+- Tools provide a clean integration point to swap synthetic data for real backends (databases, pricing engines, FX services) with minimal changes.
+- Admin and export tools, together with observability, make the system **inspectable, auditable and maintainable** – properties that are non-negotiable in actual pricing and finance workflows.
+
+In summary, tools are not a cosmetic extra here. They are the **backbone of the FX-aware pricing workflow**, giving the agents reliable numbers to reason about and giving the enterprise a clear, testable and extensible integration surface.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Infrastructure: Memory, Observability & Long-Running Regression
+
+Behind the FX-aware pricing pipeline there is an infrastructure layer that makes the system **stateful, observable and safe to run at portfolio scale**. This layer combines:
+
+- a **session & memory system**,
+- an **observability / callbacks stack**,
+- and dedicated support for **long-running, regression-style scenarios** (including the 1,000-device run).
+
+Together, these pieces turn the notebook from a one-off demo into something close to an enterprise service.
+
+---
+
+### 8.1 Sessions & Memory System
+
+The memory system has two main responsibilities:
+
+1. **Attach state to each run** (sessions).  
+2. **Persist key artifacts** from runs so they can be inspected or aggregated later (memory bank).
+
+#### Session management
+
+Each orchestrator run is created inside a **session**, managed by a session service (e.g. `InMemorySessionService`):
+
+- A session ID is created for each scenario (single device demo, test run, or batch run).
+- All agent calls, tool invocations and outputs are logically tied to that session.
+- This allows the system to:
+  - distinguish multiple runs executed in the same notebook,
+  - replay or inspect a particular run by its session identifier,
+  - later extend the design to distributed or remote runtimes without changing the agents.
+
+From the Capstone perspective, this covers **“Sessions & state management”** in a concrete way.
+
+#### Memory bank for key artifacts
+
+On top of sessions, a **memory bank** is used to store the “important pieces” of each run:
+
+- Human-readable **decision briefs** (executive summaries for each device).
+- **Structured summaries** (JSON objects with recommended price, margins, FX scenarios, etc.).
+- **Evaluation results** from the judge agent (overall scores, per-dimension scores, flags).
+- References to **observability exports** (logs, invocation counters) where relevant.
+
+Typical uses:
+
+- For a single MacBook demo, the brief and evaluation can be recalled later, even after other experiments.
+- For the 1,000-device run, the memory bank acts like a compact “portfolio snapshot”: each device has its own brief, metrics and evaluation record that can be aggregated or filtered.
+
+This is the project’s implementation of **“Long term memory (e.g. Memory Bank)”** in the competition feature list.
+
+#### Context engineering & compaction
+
+Because agents run in sequence and can share a lot of data, the memory system is designed with **context compaction** in mind:
+
+- Agents exchange **structured JSON**, not raw concatenated transcripts.
+- Only essential fields are passed forward (e.g. price bands, FX scenario objects, margin tables), rather than every intermediate string.
+- For console output, long blocks (briefs, evaluations) are **truncated** to the first N characters and accompanied by a note and a link to full logs.  
+  This keeps the notebook readable while preserving the full detail in memory / exported files.
+
+In practice, this means the project does not waste context window on noise and can scale to longer scenarios without rewriting prompts every time.
+
+---
+
+### 8.2 Observability & Callbacks
+
+The observability layer wraps the orchestrator and agents with **logging and metrics**, so each run is not just a black box but a fully traced execution.
+
+#### Logging and invocation counters
+
+A lightweight plugin system is used to hook into the agent engine:
+
+- **Callbacks** trigger:
+  - **before / after model calls**,
+  - **before / after tool calls**,
+  - **before / after agent calls**.
+- A custom observability plugin (extending a logging plugin) maintains **simple counters**:
+  - number of model invocations,
+  - number of tool invocations,
+  - number of agent invocations,
+  - number of errors and total events.
+
+These counters are collected into an **observability summary** that is returned alongside each orchestrator result. A typical summary surface includes:
+
+- `model_invocations`
+- `tool_invocations`
+- `agent_invocations`
+- `error_count`
+- `event_count`
+
+This directly addresses **“Observability: Logging, Tracing, Metrics”** from the Capstone feature list.
+
+#### Basic health checks
+
+On top of raw counters, the infrastructure builds a **basic health** object:
+
+- `passed` – whether the pipeline completed without critical issues.
+- `issue_count` – number of detected issues (e.g., JSON repair attempts, missing fields).
+- Possibly a short list of health flags.
+
+This makes it easy to distinguish between:
+
+- a “clean” run (all agents behaved as expected),
+- and a “noisy” run (e.g., an agent needed multiple retries or failed to produce valid JSON).
+
+In an enterprise context, this health status can be surfaced in dashboards or alerts.
+
+#### Exporting logs and conversations
+
+The observability layer is complemented by dedicated admin tools:
+
+- `export_conversation()` – exports the full agent conversation for a run (prompts, responses, intermediate steps).
+- `export_logs()` – exports structured logs (events, timestamps, invocation counts, errors).
+
+This is particularly important for:
+
+- **investigating outliers** in the 1,000-device regression (e.g. low evaluation scores),
+- preparing **documentation examples** (e.g. the MacBook demo with full trace),
+- and any future **post-mortems** if something goes wrong in production.
+
+---
+
+### 8.3 Long-Running Scenarios & Regression
+
+The project goes beyond single-scenario demos and explicitly supports **long-running, portfolio-level tests**.
+
+#### From single device to 1,000 devices
+
+The same orchestrator that handles a single MacBook scenario is used to run **large batches of devices**:
+
+- A multi-device test harness prepares a list (or generator) of product configurations, such as:
+  - different high-value devices,
+  - various regions and currencies,
+  - a range of purchase prices, volumes and margin targets.
+- For each configuration, the orchestrator:
+  - executes the full multi-agent pipeline,
+  - stores the raw result object,
+  - extracts the decision brief, structured summary and evaluation into `evaluation_results`.
+- For notebook readability, each device’s textual output is **truncated** in the cell output, while full logs and results are exported externally and referenced via links.
+
+This is the practical interpretation of **“Long-running operations”** in the Capstone brief: instead of thinking in terms of one long interactive chat, the project treats a long-running scenario as **“run the full pipeline 1,000 times and keep all structured results”**.
+
+#### Regression testing
+
+Because each device run produces:
+
+- a structured evaluation JSON (with scores and flags),
+- and observability metrics,
+
+the 1,000-device scenario doubles as a **regression test suite**:
+
+- After changing prompts, tools or models, the same scenario can be re-run.
+- Aggregated statistics (mean overall score, mean per-dimension scores, distribution of flags) can be compared between runs.
+- Significant drops in scores or sudden spikes in errors immediately show that something regressed in the reasoning pipeline or tool behavior.
+
+In a real deployment, this pattern would be the basis for CI-style checks:
+
+- new agent version → run portfolio regression → block rollout if quality drops.
+
+#### Pause / resume design
+
+While the notebook itself does not implement an interactive “pause / resume” button, the way long-running scenarios are structured makes such behavior straightforward in a production setting:
+
+- The input portfolio (list of devices) can be split into **batches** (e.g. 100 devices at a time).
+- Each batch can be treated as a job with its own session IDs and exported results.
+- If a job is interrupted, it is enough to:
+  - check which sessions / device IDs have results,
+  - restart the orchestrator only for missing ones.
+
+This is consistent with the spirit of **“Long-running operations (pause/resume agents)”**: the system is architected to handle large batches and partial restarts without redesigning the agents.
+
+---
+
+### 8.4 How Memory, Observability and Regression Work Together
+
+These three infrastructure pieces are designed to reinforce one another:
+
+- **Memory** keeps the *what*:
+  - decision briefs,
+  - structured summaries,
+  - evaluation results for each device and run.
+
+- **Observability & callbacks** keep the *how*:
+  - which agents and tools were used,
+  - how many times,
+  - with what error profile and basic health.
+
+- **Long-running regression** provides the *when and how often*:
+  - repeated runs over large portfolios,
+  - comparisons across time and code/model versions,
+  - a realistic load profile for an enterprise workflow.
+
+For the Capstone evaluation, this means the project does not only show a clever multi-agent pipeline. It also demonstrates that the pipeline is **stateful, observable and robust enough** to support real-world, FX-aware pricing decisions at portfolio scale, and to be safely iterated on through systematic regression testing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Final End-to-End Pipeline: FX-Aware Pricing Orchestrator
+
+The **Final Pipeline** is the place where all pieces of the system – agents, tools, memory, observability and evaluation – come together into **one callable function**. This is the “single entry point” that a pricing manager, another system, or a batch runner would use to obtain a complete FX-aware pricing recommendation for any product.
+
+---
+
+### 12.1 What the final pipeline does
+
+The final pipeline function (the FX-Aware Orchestrator wrapper) takes a **single product configuration** and runs the entire multi-agent workflow end-to-end:
+
+1. **Initialise infrastructure**
+   - Sets up the **session** (or reuses an existing one).
+   - Attaches **observability plugins** (logging + invocation counters).
+   - Prepares an empty `context` object that will be passed through the agents.
+
+2. **Run the agent chain**
+   - Calls the **Market Research Agent** to understand the market and get an initial price band.
+   - Calls the **Competitive Pricing Agent** to refine the price band and positioning vs key competitors.
+   - Calls the **Vendor FX Agent (Remote A2A)** to generate base / adverse / favourable FX scenarios.
+   - Calls the **FX Impact Analysis Agent** to compute landed costs and margins under each scenario.
+   - Calls the **Margin Scenario Planner Agent** to explore candidate prices and choose a pricing strategy.
+   - Calls the **Decision Brief Agent** to assemble a clear narrative and structured summary.
+   - Calls the **Evaluation Agent-as-Judge** to score the final recommendation and highlight strengths/weaknesses.
+
+3. **Collect tools and metrics**
+   - Collects outputs from all relevant tools:
+     - `get_product_snapshot`
+     - `get_competitive_snapshot`
+     - `get_fx_scenarios`
+     - `compute_margin_plan`
+     - and any observability/export tools used.
+   - Gathers **invocation counts** and **errors** into an observability summary.
+   - Builds a **basic health** object with pass/fail status and issue count.
+
+4. **Persist artefacts**
+   - Writes key artefacts into the **memory system**:
+     - decision brief text,
+     - structured summary JSON,
+     - evaluation JSON,
+     - references to logs / exports when relevant.
+   - Optionally stores a compact **summary record** per run (useful in the 1,000-device regression).
+
+5. **Return a single structured result**
+   - Returns a result object that includes:
+     - `decision_brief`
+     - `structured_summary_json`
+     - `evaluation_json`
+     - `observability_summary`
+     - `basic_health`
+     - internal `context` snapshot or references (for debugging / analysis).
+
+From the outside, the final pipeline behaves like a **single “pricing recommendation API”** for a given device and market.
+
+---
+
+### 12.2 Input and output shape
+
+To make the pipeline usable both interactively and from other code, the function is designed with a **clear, JSON-friendly contract**.
+
+**Input (simplified)**
+
+- `product_config`:
+  - `product_name`
+  - `category`
+  - `region`
+  - `reporting_currency`
+  - `purchase_currency`
+  - `purchase_price`
+  - `current_or_planned_price`
+  - `target_margin_pct`
+  - `volume_units`
+  - `manager_notes`
+  - optional `user_id` and other metadata
+
+- optional execution parameters:
+  - flags for verbosity / debug printing,
+  - session or run identifiers,
+  - random seeds or model configuration overrides, if needed.
+
+**Output (simplified)**
+
+- `decision_brief_text` – the human-readable, executive summary.
+- `structured_summary_json` – machine-readable summary (recommended price, price band, FX scenarios, margins, key risks).
+- `evaluation_json` – evaluation agent output (overall score, per-dimension scores, flags, comment).
+- `observability_summary` – model/tool/agent invocation counts, errors, event counts.
+- `basic_health` – pass/fail flag and issue count.
+- optionally `raw_context` – a subset of internal context useful for debugging or downstream processing.
+
+This structure makes it easy to integrate the pipeline into:
+
+- dashboards (using structured JSON),
+- reporting systems,
+- or additional analysis / regression scripts.
+
+---
+
+### 12.3 How the final pipeline uses agents and tools internally
+
+The final pipeline is essentially a **thin, but carefully structured wrapper** around the orchestrator and agents:
+
+- It **calls the orchestrator once**, passing in:
+  - the product configuration,
+  - pre-bound agent definitions,
+  - toolkits,
+  - memory and observability services.
+
+- Inside, the orchestrator:
+  - executes the **agent sequence**,
+  - calls **tools** where needed,
+  - updates **context** after each step,
+  - and aggregates all outputs.
+
+- At the end, the wrapper:
+  - extracts only the **most important fields** into the top-level result object,
+  - applies any necessary truncation for notebook display (e.g. limit brief text length in console),
+  - leaves full-length artefacts available via memory/log exports.
+
+Conceptually, this function is where the project stops being “a set of agents and tools” and becomes **one coherent FX-aware pricing service**.
+
+---
+
+### 12.4 Relationship to Testing and Regression
+
+The final pipeline is reused across multiple parts of the notebook:
+
+- **Smoke tests**:
+  - Invoke the pipeline (or its sub-agents) on small, fixed configurations to verify basic behaviour.
+- **Multiple test scenarios**:
+  - Run the final pipeline on a curated set of flagship devices to confirm that outputs look realistic and diverse.
+- **1,000-device regression**:
+  - The batch runner simply calls the **same final pipeline function** in a loop for each device configuration.
+  - For each run, it collects:
+    - `evaluation_json`,
+    - selected metrics,
+    - truncated text blocks,
+    - and aggregates them into `evaluation_results` for quantitative analysis.
+
+This reuse is intentional: any improvement or change in the final pipeline is **automatically covered** by all existing tests and regression runs.
+
+---
+
+### 12.5 Why the final pipeline matters for the Capstone evaluation
+
+For the Capstone judges, the final pipeline:
+
+- Demonstrates that the multi-agent architecture is **not just a collection of examples**, but forms a **single, well-defined system**.
+- Shows that the project can be turned into a real **enterprise endpoint** with minimal changes:
+  - input is a well-structured JSON-like config,
+  - output is a well-structured JSON-like result with metrics and evaluation.
+- Integrates **Gemini, tools, sessions/memory, observability, agent evaluation and long-running behaviour** into one consistent flow.
+
+In practice, this block answers the question:
+
+> “If we had to call your solution from a real pricing workflow tomorrow, what single function would we call, and what would it give us back?”
+
+The **Final Pipeline** is precisely that function.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Testing & Evaluation: From Smoke Tests to 1,000-Device Regression
+
+The project treats testing and evaluation as a **first-class part of the architecture**, not an afterthought. The goal is to show that the FX-Aware Pricing & Marketing Agent is not only clever on a single demo, but also:
+
+- behaves predictably on **every agent and tool in isolation**,
+- produces **stable, high-quality outputs end-to-end**,
+- and scales to a **1,000-device portfolio run** with structured metrics that can be inspected and compared over time.
+
+---
+
+### 13.1 Testing goals
+
+The testing layer is designed around three practical questions:
+
+1. **Does each building block work on its own?**  
+   Tools and agents should not crash on a realistic, but minimal input.
+
+2. **Does the full pipeline produce sane, decision-ready outputs?**  
+   The orchestrator should consistently generate:
+   - a coherent decision brief,
+   - structured summary JSON,
+   - evaluation JSON,
+   - and healthy observability metrics.
+
+3. **Does behaviour stay stable at scale and over time?**  
+   Running the pipeline on **1,000 devices** should:
+   - complete without systemic failures,
+   - keep evaluation scores within a reasonable band,
+   - and expose regressions when prompts or code change.
+
+The notebook reflects this by organizing tests from **low-level sanity checks** up to **portfolio-scale regression**.
+
+---
+
+### 13.2 Tool and agent smoke tests
+
+The first layer focuses on **smoke tests**: cheap checks that quickly reveal obvious wiring or contract problems.
+
+#### Tool sanity checks
+
+- A dedicated test cell iterates through the **toolkit** and runs:
+  - `get_product_snapshot()`
+  - `get_competitive_snapshot()`
+  - `get_fx_scenarios()`
+  - `compute_margin_plan()`
+  - and the export / admin tools where meaningful.
+- Each tool is:
+  - enumerated with a clear label (e.g. `[1] get_product_snapshot()`),
+  - invoked on a **small, realistic config**,
+  - and its output is rendered in a compact format.
+
+If a tool is misconfigured (wrong signature, missing field, unexpected type), it fails here in a very visible way, before it can corrupt agent outputs deeper in the pipeline.
+
+#### Smoke tests for individual agents
+
+- For each of the **seven core agents** (Market Research, Competitive Pricing, Vendor FX, FX Impact, Margin Planner, Decision Brief, Evaluation), there is a **lightweight smoke test**:
+  - the agent is instantiated with the same toolkits and model config as in the real pipeline,
+  - it is called with a minimal but realistic product configuration,
+  - the output is inspected for:
+    - presence of required sections / fields,
+    - valid structured JSON blocks,
+    - absence of obvious errors or empty strings.
+
+- To keep the notebook readable, agent outputs are:
+  - **truncated** to the first N characters (e.g. 300–500),
+  - followed by a note that the full text and JSON are available in memory / exported logs.
+
+These smoke tests give confidence that **each agent respects its contract** and that any failure will be localized to a small, understandable piece of the system.
+
+---
+
+### 13.3 End-to-end pipeline tests
+
+After tools and agents pass smoke tests, the notebook validates the **full orchestrated flow**.
+
+#### Single-scenario pipeline checks
+
+- The FX-Aware Orchestrator is run end-to-end on one or more **flagship product configurations** (e.g. a high-end laptop launch).
+- For each run, the notebook prints:
+  - the **decision brief**,
+  - the **structured summary** in a readable, indented form,
+  - the **evaluation JSON** from the judge agent,
+  - the **observability summary** (model/tool/agent invocation counts, error count, event count),
+  - the **basic health** flags.
+
+This confirms that all agents, tools, memory and observability integrate correctly into a **single result object** that looks like something a pricing manager could review.
+
+#### Agent2Agent evaluation on real outputs
+
+- A separate **Agent2Agent** section shows how the Evaluation Agent-as-Judge:
+  - takes an already generated decision brief and structured summary,
+  - scores them using its internal rubric,
+  - and returns overall and per-dimension scores plus flags and a comment.
+- This demonstrates that evaluation is not just theoretical: it is applied directly to real outputs produced by the pipeline.
+
+---
+
+### 13.4 1,000-device regression run
+
+The most demanding test is a **portfolio-scale regression**, where the orchestrator is run on **1,000 different device configurations**.
+
+#### Scenario construction
+
+- A list (or generator) of about **1,000 `device_config` objects** is prepared, each representing a product with:
+  - name and category,
+  - region and currencies,
+  - purchase price and planned price,
+  - volume assumptions,
+  - target margin,
+  - and manager notes.
+- These configs are designed to span:
+  - multiple price bands,
+  - different FX exposures,
+  - and a variety of volumes and margin pressures.
+
+This simulates a realistic global portfolio rather than a single flagship launch.
+
+#### Batch execution
+
+- A test harness loops over this list and, for each device:
+  - calls the **same final pipeline** as in the demo,
+  - collects the full `result` object,
+  - appends raw results to a list,
+  - extracts:
+    - `decision_brief_text` (truncated in the console),
+    - `structured_summary_json`,
+    - `evaluation_json`,
+    - derived metrics (e.g. margin, recommended price) via helper functions,
+  - appends the evaluation and metrics to an `evaluation_results` structure.
+
+- To preserve notebook readability:
+  - each device’s printed output is limited to the **first N characters** of the major text fields,
+  - a short message explains that output is truncated and points to full logs / exports for the complete trace,
+  - **full, untruncated logs and results** for the 1,000-device run are exported to external storage and referenced from the notebook.
+
+This demonstrates that the pipeline can be applied at **portfolio scale** without manual intervention.
+
+---
+
+### 13.5 Aggregation and analysis of evaluation metrics
+
+The project does not stop at “it ran 1,000 times”; it also **aggregates quality metrics** across the portfolio:
+
+- The `evaluation_results` list is converted into a tabular structure (e.g. a DataFrame-like object).
+- The notebook computes:
+  - average **overall score**,
+  - average **coverage / consistency / clarity / actionability**,
+  - basic distribution statistics (min, max, mean, maybe histograms when visualized),
+  - counts of important **flags** (e.g. how often “weak_link_to_target_margin” appears).
+
+These aggregates show:
+
+- whether the agent’s performance is consistent across devices and markets,
+- whether any dimension (e.g. actionability) is systematically weaker and requires prompt or tool improvements,
+- and whether future changes to prompts or tools cause **regressions** (drop in average scores, spike in negative flags).
+
+This is effectively a **quantitative evaluation loop** driven by the Evaluation Agent-as-Judge.
+
+---
+
+### 13.6 How this supports the Capstone “Implementation” and “Agent evaluation” criteria
+
+From the Capstone perspective, the Testing & Evaluation layer demonstrates:
+
+- **Technical Implementation**
+  - Systematic use of tools and agents in isolation (smoke tests).
+  - Robust end-to-end validation of the orchestrator on realistic scenarios.
+  - Portfolio-level regression on **1,000 devices**, which is closer to a production workload than a toy example.
+
+- **Agent Evaluation**
+  - A dedicated Evaluation Agent-as-Judge with a clear rubric (coverage, consistency, clarity, actionability).
+  - Structured evaluation outputs aggregated across a large portfolio.
+  - The ability to detect and reason about regressions if prompts or models change.
+
+Overall, Testing & Evaluation show that the FX-Aware Marketing & Pricing Strategy Agent is **not only a multi-agent demo**, but a system that has been exercised, measured and stress-tested in a way that is consistent with real enterprise expectations.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Project Journey: From Idea to FX-Aware Multi-Agent System
+
+This project did not start as “a capstone submission”, but as a very practical question:  
+*how can we stop doing FX-aware pricing decisions manually in spreadsheets and Slack threads?*  
+A friend working as a marketing / pricing manager described a workflow where every new device launch meant re-collecting market data, checking competitors, opening FX dashboards, recomputing margins, and writing long email-style summaries for leadership. That manual loop became the seed for this agent.
+
+---
+
+### 15.1 Initial idea and scope
+
+At the beginning of the course, the goal was still vague:  
+“build **an agent that helps with international pricing decisions**.”
+
+During the first day of the intensive, it became clear that this fits the **Enterprise Agents** track almost perfectly:
+
+- real business workflow (pricing / marketing),
+- multiple data sources (products, competitors, FX),
+- need for repeatability and auditability,
+- and a clear notion of “quality” (is this recommendation good enough?).
+
+The idea crystallized into:
+
+> **FX-Aware Marketing & Pricing Strategy Agent**  
+> A system that can take a product configuration and produce a decision-ready pricing recommendation, explicitly accounting for FX scenarios, margins and competitors.
+
+At this stage it was essentially a **single-agent vision**: one powerful Gemini call with a long prompt.
+
+---
+
+### 15.2 First prototype: single-agent “super prompt”
+
+The first working prototype was intentionally simple:
+
+- a **single Gemini-powered agent**,
+- a long prompt describing:
+  - product context,
+  - competition,
+  - FX considerations,
+  - and what the final brief should contain.
+- the agent produced one large text answer with:
+  - some discussion of market and competitors,
+  - a rough target price,
+  - and a short explanation.
+
+This was useful as a baseline, but also highlighted the limitations:
+
+- No **structured outputs** (everything in one blob of text).
+- Hard to **re-use** or **test** parts of the reasoning.
+- Difficult to attach **tools** or **metrics** to specific steps.
+- Fragile when prompts changed, because everything was entangled.
+
+From this point, the goal shifted from “one strong agent” to a **modular multi-agent pipeline**.
+
+---
+
+### 15.3 Transition to a multi-agent architecture
+
+The next phase of the journey was about **breaking the problem down** into coherent steps that match how a human pricing lead would actually think:
+
+1. Understand the **market and segment**.
+2. Position against **competitors**.
+3. Quantify **FX scenarios**.
+4. Translate FX into **landed cost and margin**.
+5. Explore **pricing strategies and margin scenarios**.
+6. Craft a **decision brief**.
+7. Judge the final result with a **quality rubric**.
+
+Each of these became its own **LLM agent**:
+
+- Market Research Agent  
+- Competitive Pricing Agent  
+- Vendor FX Agent (Remote A2A)  
+- FX Impact Analysis Agent  
+- Margin Scenario Planner Agent  
+- Decision Brief Agent  
+- Evaluation Agent-as-Judge  
+
+The **orchestrator** was introduced as a separate, explicit agent:
+
+- it calls the others in sequence,
+- handles input/output contracts,
+- and assembles one unified result object.
+
+This step was the turning point where the project became a **true multi-agent system** rather than a single prompt.
+
+---
+
+### 15.4 Building the tools and infrastructure around the agents
+
+Once the agents were in place, the next challenge was to make them **reliable, testable and reusable**.  
+That meant introducing a proper infrastructure layer:
+
+#### Domain tools
+
+The first concrete addition was a **tools toolkit**:
+
+- `get_product_snapshot()` to standardize product data,
+- `get_competitive_snapshot()` to provide competitor lists,
+- `get_fx_scenarios()` for FX shocks,
+- `compute_margin_plan()` for margin calculations,
+- plus export tools for conversations and logs.
+
+This allowed agents to stop “guessing” numbers and instead **delegate all critical math and data** to deterministic tools.
+
+#### Memory & sessions
+
+The second step was adding a **memory system** and session management:
+
+- sessions for each run,
+- memory bank for decision briefs, structured summaries and evaluation outputs.
+
+This made runs traceable and allowed later aggregation (e.g. for the 1,000-device scenario).
+
+#### Observability & callbacks
+
+The third step was adding **observability**:
+
+- logging plugins,
+- invocation counters for models, tools and agents,
+- basic health summaries.
+
+At this point, each orchestrator run had not only a recommendation, but also a **small telemetry bundle** explaining how it was produced.
+
+---
+
+### 15.5 Introducing testing, smoke checks and the Evaluation Agent
+
+Once the pipeline became more complex, it was clear that a serious **testing layer** was needed.
+
+The project evolved in three moves:
+
+1. **Tool smoke tests**  
+   - Ensure each core tool runs on realistic inputs and returns the expected structure.
+
+2. **Agent smoke tests**  
+   - Execute each of the 7 agents with a controlled product configuration,
+   - Check that they return both narrative and structured JSON,
+   - Truncate output in the notebook while keeping full logs for inspection.
+
+3. **Agent-as-judge evaluation**  
+   - Add a dedicated **Evaluation Agent** that scores:
+     - coverage,
+     - consistency,
+     - clarity,
+     - actionability,
+   - returns an overall score and list of flags.
+
+This was a key learning outcome from the course: **agents can evaluate other agents**, and those evaluations can become quantitative signals for regression testing.
+
+---
+
+### 15.6 Scaling up: 1,000-device regression scenario
+
+The next milestone was to move beyond individual examples and test whether the system behaves like a real **enterprise pricing service**.
+
+A **1,000-device regression scenario** was introduced:
+
+- A synthetic portfolio of ~1,000 devices was constructed with varying:
+  - prices,
+  - volumes,
+  - FX exposures,
+  - margin targets.
+- The same end-to-end orchestrator function was executed for each device.
+- For every run, the system stored:
+  - decision brief (truncated in console),
+  - structured summary JSON,
+  - evaluation JSON,
+  - derived metrics (e.g. margins, recommended prices),
+  - observability stats.
+
+It quickly became obvious that printing everything would make the notebook unreadable, so output truncation and **external log exports** were added, with links in the notebook to full results.
+
+At this stage, the project started to feel like a **mini internal pricing platform**, not just a notebook experiment.
+
+---
+
+### 15.7 Refinement: documentation, demos and architecture diagram
+
+With the core behavior in place, the final phase focused on **clarity and presentation**:
+
+- A **demo scenario** for a high-end MacBook launch was prepared:
+  - clean user prompt,
+  - full agent response with decision brief, structured summary and evaluation,
+  - observability and health summaries.
+
+- A **high-level architecture diagram** was created:
+  - showing user → orchestrator → agents → tools → memory/observability → testing & regression,
+  - designed both for the notebook and as a Kaggle card/thumbnail image.
+
+- The notebook was gradually filled with **markdown documentation blocks**:
+  - explaining the problem and business context,
+  - mapping the implementation to the Capstone feature list,
+  - describing each agent and infrastructure topic,
+  - narrating the testing and regression story.
+
+The goal was that a judge could open the notebook and understand **what the system does, how it is built, and why each piece exists**, without reading the raw code first.
+
+---
+
+### 15.8 Lessons learned and future directions
+
+Looking back, a few key lessons shaped the project:
+
+- **Multi-agent > multi-prompt**  
+  Breaking the problem into agents with clear roles made the system easier to debug, test and reason about than a single huge “super prompt”.
+
+- **Tools and structure are as important as the LLM**  
+  The most robust behavior came when:
+  - facts and calculations were moved into tools,
+  - agents emitted strict JSON,
+  - and the orchestrator enforced contracts.
+
+- **Evaluation closes the loop**  
+  Adding an Evaluation Agent and aggregating scores over 1,000 devices turned the project into a **measurable system**, not just a set of “nice outputs”.
+
+- **Infrastructure matters for Enterprise Agents**  
+  Memory, observability, and regression runs are not cosmetic; they are what make the agent credible for real enterprise workflows.
+
+If this project continues after the Capstone, the natural next steps would be:
+
+- hooking tools to real product / FX / competitor data sources,
+- deploying the orchestrator behind an API in a cloud runtime,
+- and turning the 1,000-device regression into a regular CI-style quality gate for any changes to prompts or models.
+
+For the purposes of this Capstone, the journey ends with a system that is **architecturally complete, well-documented, and exercised at portfolio scale**, demonstrating both the concepts from the course and a realistic Enterprise Agent use case.
+
