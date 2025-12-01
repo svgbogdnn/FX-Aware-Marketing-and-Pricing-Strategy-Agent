@@ -1,0 +1,3 @@
+https://www.kaggle.com/learn-guide/5-day-agents
+https://www.kaggle.com/competitions/agents-intensive-capstone-project
+https://www.kaggle.com/code/yngbogdnn27/fx-aware-marketing-and-pricing-strategy-agent
